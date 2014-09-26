@@ -52,3 +52,12 @@ coverage.xml
 # Sphinx documentation
 docs/_build/
 
+# Mercurial Repos
+.hg
+
+# Pycharm stuff
+.idea
+
+# Gedit crap
+*~
+

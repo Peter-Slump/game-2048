@@ -48,7 +48,6 @@ class Game2048(object):
         self.reset()
 
     def reset(self, initial_number=2):
-
         """
         Reset the game.
 
@@ -67,7 +66,6 @@ class Game2048(object):
         self._highest_value = 0
 
     def add_random_number(self, values=(2, 4)):
-
         """
         Add a random number on an empty spot in the grid.
 
@@ -88,7 +86,6 @@ class Game2048(object):
         self._grid[location[0]][location[1]] = random.choice(values)
 
     def move(self, direction):
-
         """
         Move the grid and add a random number to the grid.
 
@@ -98,9 +95,8 @@ class Game2048(object):
 
         """
 
-        self.move_grid(direction=direction)
-
-        self.add_random_number()
+        if self.move_grid(direction=direction):
+            self.add_random_number()
 
     def move_grid(self, direction):
         """
@@ -129,6 +125,7 @@ class Game2048(object):
         >>> game = Game2048()
         >>> game._grid = [[2, None, None, None], [None, 2, None, 2], [2, 2, 4, 2], [None, None, 8, 2]]
         >>> game.move_grid('up')
+        True
         >>> game._grid
         [[4, 4, 4, 4], [None, None, 8, 2], [None, None, None, None], [None, None, None, None]]
 
@@ -151,6 +148,7 @@ class Game2048(object):
 
         >>> game._grid = [[None, None, 8, 2], [2, 2, 4, 2], [None, 2, None, 2], [2, None, None, None]]
         >>> game.move_grid('down')
+        True
         >>> game._grid
         [[None, None, None, None], [None, None, None, None], [None, None, 8, 2], [4, 4, 4, 4]]
 
@@ -172,6 +170,7 @@ class Game2048(object):
         ]
         >>> game._grid = [[2, None, 2, None], [None, 2, 2, None], [None, None, 4, 8], [None, 2, 2, 2]]
         >>> game.move_grid('left')
+        True
         >>> game._grid
         [[4, None, None, None], [4, None, None, None], [4, 8, None, None], [4, 2, None, None]]
 
@@ -192,6 +191,7 @@ class Game2048(object):
         ]
         >>> game._grid = [[None, 2, None, 2], [None, 2, 2, None], [4, 8, None, None], [2, 2, 2, None]]
         >>> game.move_grid('right')
+        True
         >>> game._grid
         [[None, None, None, 4], [None, None, None, 4], [None, None, 4, 8], [None, None, 2, 4]]
         """
@@ -199,51 +199,76 @@ class Game2048(object):
             raise Exception('Invalid direction')
 
         reversed_ = direction in self.DIRECTIONS_REVERSED
+        grid_changed = False
 
+        # Create the range to loop through. Normally this will be a list from 0 - grid size. When reversed this will be
+        # from grid size to zero.
         if reversed_:
             range_ = range(self._grid_size - 1, -1, -1)
         else:
             range_ = range(self._grid_size)
 
+        # When horizontal loop through rows, else loop through columns.
         for primary_i in range_:
 
+            # Cursor represents the location where the next not-None value should be placed or summed. Initially this
+            # will be the first position in the range.
             cursor_i = range_[0]
 
+            # Loop through columns when moving horizontally else loop through the rows.
             for secondary_i in range_:
 
+                # Initially we don't have to move the cursor. Moving cursor happens at the bottom of the loop when
+                # needed.
                 move_cursor = False
 
+                # New value represents the new value which should be placed on the currently handled position.
+                new_value = None
+
+                # Determine the values of the current handled position and the value at the cursor position.
                 if direction in self.DIRECTIONS_VERTICAL:
-                    column_value = self._grid[secondary_i][primary_i]
+                    current_value = self._grid[secondary_i][primary_i]
                     cursor_value = self._grid[cursor_i][primary_i]
                 else:
-                    column_value = self._grid[primary_i][secondary_i]
+                    current_value = self._grid[primary_i][secondary_i]
                     cursor_value = self._grid[primary_i][cursor_i]
 
-                if column_value is None:
+                # No value in this position so we don't have to do anything.
+                # Also if we are currently handling the cursor position we don't have to do anything.
+                if current_value is None or cursor_i == secondary_i:
                     continue
 
-                if column_value != cursor_value:
+                if current_value != cursor_value:
+                    # Current value is not equal to the cursor value. We need to set the column value on the cursor
+                    # position.
 
                     if cursor_value is not None:
+                        # There is already a value on the cursor position so se need to shift the cursor to the next
+                        # position which makes that the value will be placed on the next empty spot.
                         cursor_i += -1 if reversed_ else 1
 
-                    cursor_value = column_value
-                    new_value = None
+                        if cursor_i == secondary_i:
+                            # The cursor moved to the current position, we can just continue with the next position
+                            continue
 
-                elif secondary_i != cursor_i:
-
-                    cursor_value = column_value + cursor_value
-                    new_value = None
-                    move_cursor = True
-
-                    self._score += cursor_value
-                    if cursor_value > self._highest_value:
-                        self._highest_value = cursor_value
+                    cursor_value = current_value
+                    grid_changed = True
 
                 else:
-                    cursor_value = new_value = column_value
+                    # Cursor and current values are equal so we have to sum them. And make sure that the cursor is moved
+                    # to the next position after updating the grid.
+                    cursor_value = current_value + cursor_value
+                    grid_changed = True
+                    move_cursor = True
 
+                    # Update score
+                    self._score += cursor_value
+
+                    if cursor_value > self._highest_value:
+                        # New value is higher than the highest value before in the grid.
+                        self._highest_value = cursor_value
+
+                # Update the grid with new values.
                 if direction in self.DIRECTIONS_VERTICAL:
                     self._grid[secondary_i][primary_i] = new_value
                     self._grid[cursor_i][primary_i] = cursor_value
@@ -251,5 +276,8 @@ class Game2048(object):
                     self._grid[primary_i][secondary_i] = new_value
                     self._grid[primary_i][cursor_i] = cursor_value
 
+                # When required move the cursor one position.
                 if move_cursor:
                     cursor_i += -1 if reversed_ else 1
+
+        return grid_changed
